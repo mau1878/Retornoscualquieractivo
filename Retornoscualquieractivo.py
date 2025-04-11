@@ -441,7 +441,7 @@ with tab1:
                             x=ret_value,
                             y=annotation_y_position,  # Position in relative y-coordinates (0 to 1)
                             yref="paper",  # Use paper coordinates for y (relative to the plot area)
-                            text=f"{date.strftime('%Y-%m-%d')}<br>{ret_value:.2f}%",
+                            text=f"{date.strftime('%Y-%m-%d')} {ret_value:.2f}%",
                             showarrow=True,
                             arrowhead=1,
                             ax=20,  # Offset the arrow to the right
