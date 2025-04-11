@@ -446,9 +446,9 @@ with tab1:
                             arrowhead=1,
                             ax=20,  # Offset the arrow to the right
                             ay=0,   # No vertical offset for the arrow
-                            textangle=0,  # Horizontal text to avoid overlap
+                            textangle=180,  # Horizontal text to avoid overlap
                             font=dict(color="green", size=10),  # Smaller font size
-                            align="left"
+                            align="right"
                         )
                     fig_hist.add_annotation(text="MTaurus. X: mtaurus_ok", xref="paper", yref="paper", x=0.95, y=0.05, 
                                             showarrow=False, font=dict(size=14, color="gray"), opacity=0.5)
