@@ -444,7 +444,7 @@ with tab1:
                             text=f"{date.strftime('%Y-%m-%d')} {ret_value:.2f}%",
                             showarrow=True,
                             arrowhead=1,
-                            ax=20,  # Offset the arrow to the right
+                            ax=10,  # Offset the arrow to the right
                             ay=0,   # No vertical offset for the arrow
                             textangle=90,  # Horizontal text to avoid overlap
                             font=dict(color="green", size=10),  # Smaller font size
