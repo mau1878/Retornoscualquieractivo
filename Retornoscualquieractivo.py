@@ -446,7 +446,7 @@ with tab1:
                             arrowhead=1,
                             ax=20,  # Offset the arrow to the right
                             ay=0,   # No vertical offset for the arrow
-                            textangle=180,  # Horizontal text to avoid overlap
+                            textangle=90,  # Horizontal text to avoid overlap
                             font=dict(color="green", size=10),  # Smaller font size
                             align="right"
                         )
