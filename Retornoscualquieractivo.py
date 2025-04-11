@@ -422,6 +422,7 @@ with tab1:
                     plt.close(fig)
                     
                     # Visualización 4: Histograma Personalizable con Plotly
+                    # Visualización 4: Histograma Personalizable con Plotly
                     st.write(f"### 🎨 Personalización del Histograma ({compression})")
                     num_bins = st.slider("Seleccione el número de bins para el histograma", min_value=10, max_value=100, value=50, key="bins_original")
                     hist_color = st.color_picker("Elija un color para el histograma", value='#1f77b4', key="color_original")
@@ -432,16 +433,33 @@ with tab1:
                         fig_hist.add_vline(x=value, line=dict(color="red", width=2, dash="dash"), 
                                            annotation_text=f'{percentile}º Percentil', annotation_position="top", 
                                            annotation=dict(textangle=-90, font=dict(color="red")))
-                    for date, ret_value in zip(selected_dates, returns_values):
-                        fig_hist.add_vline(x=ret_value, line=dict(color="green", width=2, dash="solid"), 
-                                           annotation_text=f"{date.strftime('%Y-%m-%d')}\n{ret_value:.2f}%", 
-                                           annotation_position="top", annotation=dict(textangle=-90, font=dict(color="green")))
+                    for i, (date, ret_value) in enumerate(zip(selected_dates, returns_values)):
+                        # Position annotations to the right of the line, staggered to avoid overlap
+                        annotation_y_position = 0.95 - (i * 0.05)  # Stagger annotations downward
+                        fig_hist.add_vline(x=ret_value, line=dict(color="green", width=2, dash="solid"))
+                        fig_hist.add_annotation(
+                            x=ret_value,
+                            y=annotation_y_position,  # Position in relative y-coordinates (0 to 1)
+                            yref="paper",  # Use paper coordinates for y (relative to the plot area)
+                            text=f"{date.strftime('%Y-%m-%d')}<br>{ret_value:.2f}%",
+                            showarrow=True,
+                            arrowhead=1,
+                            ax=20,  # Offset the arrow to the right
+                            ay=0,   # No vertical offset for the arrow
+                            textangle=0,  # Horizontal text to avoid overlap
+                            font=dict(color="green", size=10),  # Smaller font size
+                            align="left"
+                        )
                     fig_hist.add_annotation(text="MTaurus. X: mtaurus_ok", xref="paper", yref="paper", x=0.95, y=0.05, 
                                             showarrow=False, font=dict(size=14, color="gray"), opacity=0.5)
                     fig_hist.update_layout(
                         title=f'Histograma de Retornos de {ticker} ({compression})',
-                        xaxis_title='Retornos (%)', yaxis_title='Frecuencia', bargap=0.1, 
-                        template="plotly_dark", hovermode="x unified"
+                        xaxis_title='Retornos (%)', 
+                        yaxis_title='Frecuencia', 
+                        bargap=0.1, 
+                        template="plotly_dark", 
+                        hovermode="x unified",
+                        margin=dict(t=100),  # Increase top margin to give space for the title
                     )
                     st.plotly_chart(fig_hist, use_container_width=True)
     else:
