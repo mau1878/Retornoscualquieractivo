@@ -411,7 +411,7 @@ with tab1:
                         ax.text(value, ax.get_ylim()[1] * 0.9, f'{percentile}º Percentil', color='red', rotation='vertical', verticalalignment='center', horizontalalignment='right')
                     for date, ret_value in zip(selected_dates, returns_values):
                         ax.axvline(ret_value, color='green', linestyle='-', alpha=0.5)
-                        ax.text(ret_value, ax.get_ylim()[1] * 0.95, f"{date.strftime('%Y-%m-%d')}\n{ret_value:.2f}%", 
+                        ax.text(ret_value, ax.get_ylim()[1] * 0.95, f"{date.strftime('%Y-%m-%d')} {ret_value:.2f}%", 
                                 color='green', rotation='vertical', verticalalignment='center', horizontalalignment='left')
                     ax.text(0.95, 0.05, "MTaurus. X: mtaurus_ok", fontsize=14, color='gray', ha='right', va='center', alpha=0.5, transform=fig.transFigure)
                     ax.set_title(f'Retornos de {ticker} ({compression})')
