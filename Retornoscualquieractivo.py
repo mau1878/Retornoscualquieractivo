@@ -571,8 +571,8 @@ with tab1:
                         margin=dict(t=100),
                     )
                     st.plotly_chart(fig_hist, use_container_width=True)
-        else:
-            st.warning("⚠️ Por favor, ingrese un ticker o una expresión válida.")
+            else:
+                st.warning("⚠️ Por favor, ingrese un ticker o una expresión válida.")
 
 # Pestaña 2: Análisis de Trading con Percentiles de Retornos
 with tab2:
