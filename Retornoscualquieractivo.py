@@ -37,8 +37,8 @@ def evaluate_ticker_expression(expression, data_dict, index):
     - pd.Series with the evaluated prices, or None if evaluation fails
     """
     try:
-        # Extract tickers from the expression
-        tickers = set(re.findall(r'[A-Za-z0-9\._]+', expression))
+        # Extract tickers from the expression (match letters, numbers, and dots, but require at least one letter)
+        tickers = set(re.findall(r'[A-Za-z][A-Za-z0-9\._]*', expression))
         tickers = [t for t in tickers if t in data_dict]
         
         if not tickers:
