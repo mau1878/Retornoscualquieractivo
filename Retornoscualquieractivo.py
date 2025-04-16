@@ -138,11 +138,10 @@ def download_data(tickers, start, end, compression='Daily', expression=None):
         
         if rule != 'D':
             for ticker in tickers:
-                # Only apply relevant columns for the current ticker
+                # Create a ticker-specific aggregation dictionary
                 ticker_agg_dict = {
-                    key: value for key, value in agg_dict.items() if key.startswith(f'Open {ticker}') or 
-                    key.startswith(f'High {ticker}') or key.startswith(f'Low {ticker}') or 
-                    key.startswith(f'Close {ticker}') or key.startswith(f'Volume {ticker}')
+                    key: value for key, value in agg_dict.items()
+                    if key.startswith((f'Open {ticker}', f'High {ticker}', f'Low {ticker}', f'Close {ticker}', f'Volume {ticker}'))
                 }
                 data_dict[ticker] = data_dict[ticker].resample(rule).agg(ticker_agg_dict).dropna()
             common_index = data_dict[tickers[0]].index
