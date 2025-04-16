@@ -75,7 +75,6 @@ def evaluate_ticker_expression(expression, data_dict, index):
     except Exception as e:
         st.error(f"Error al evaluar la expresión: {e}")
         return None
-
 # Función para descargar y comprimir datos
 def download_data(tickers, start, end, compression='Daily', expression=None):
     """
@@ -96,9 +95,9 @@ def download_data(tickers, start, end, compression='Daily', expression=None):
         
         data_dict = {}
         for ticker in tickers:
-            df = yf.download(ticker, start=start, end=end)
+            df = yf.download(ticker, start=start, end=end, progress=False)
             if df.empty:
-                st.warning(f"No hay datos disponibles para el ticker **{ticker}** en el rango de fechas seleccionado.")
+                st.error(f"No hay datos disponibles para el ticker **{ticker}** en el rango de fechas {start.strftime('%Y-%m-%d')} a {end.strftime('%Y-%m-%d')}. Verifique el ticker o el rango de fechas.")
                 return None
             df = flatten_columns(df, ticker)
             data_dict[ticker] = df
@@ -109,7 +108,7 @@ def download_data(tickers, start, end, compression='Daily', expression=None):
             common_index = common_index.intersection(data_dict[ticker].index)
         
         if len(common_index) == 0:
-            st.error("No hay fechas comunes entre los tickers seleccionados.")
+            st.error("No hay fechas comunes entre los tickers seleccionados. Intente un rango de fechas más reciente.")
             return None
         
         # Resample data based on compression
@@ -141,7 +140,6 @@ def download_data(tickers, start, end, compression='Daily', expression=None):
         
         if rule != 'D':
             for ticker in tickers:
-                # Create a ticker-specific aggregation dictionary
                 ticker_agg_dict = {
                     key: value for key, value in agg_dict.items()
                     if key.startswith((f'Open {ticker}', f'High {ticker}', f'Low {ticker}', f'Close {ticker}', f'Volume {ticker}'))
@@ -273,20 +271,14 @@ with tab1:
         tickers = [ticker] if ticker and re.match(r'^[A-Za-z][A-Za-z0-9\._]*$', ticker) else []
     else:
         expression = st.text_input("🖊️ Ingrese la expresión (e.g., GGAL.BA*10/GGAL)", value="GGAL.BA*10/GGAL", key="expression_original")
-        # Extract tickers using regex, exclude pure numbers
-        potential_tickers = re.findall(r'\b[A-Za-z][A-Za-z0-9\._]*\b', expression) if expression else []
-        # Validate tickers by attempting a quick download
-        tickers = []
-        for t in set(potential_tickers):
-            try:
-                df = yf.download(t, start='2000-01-01', end='2000-01-02', progress=False)
-                if not df.empty:
-                    tickers.append(t)
-            except:
-                continue
+        tickers = list(set(re.findall(r'\b[A-Za-z][A-Za-z0-9\._]*\b', expression))) if expression else []
         ticker = "Expresión Personalizada" if expression else ""
     
-    if tickers:
+    if input_type == "Ticker único" and not tickers:
+        st.warning("⚠️ Por favor, ingrese un ticker válido.")
+    elif input_type == "Expresión personalizada" and not expression:
+        st.warning("⚠️ Por favor, ingrese una expresión válida.")
+    else:
         start_date = st.date_input(
             "📅 Seleccione la fecha de inicio",
             value=pd.to_datetime('2000-01-01'),
@@ -310,274 +302,275 @@ with tab1:
         if start_date > end_date:
             st.error("La fecha de inicio no puede ser posterior a la fecha de fin.")
         else:
-            data = download_data(tickers, start_date, end_date, compression=compression, expression=expression)
+            if tickers or expression:
+                data = download_data(tickers, start_date, end_date, compression=compression, expression=expression)
 
-            if data is not None:
-                price_column = 'Derived Price' if expression else f'Close {tickers[0]}'
+                if data is not None:
+                    price_column = 'Derived Price' if expression else f'Close {tickers[0]}'
 
-                if apply_ratio:
-                    st.subheader("🔄 Aplicando ajuste por ratio YPFD.BA/YPF (CCL)")
-                    ypfd_ba_ticker = "YPFD.BA"
-                    ypf_ticker = "YPF"
-                    ypfd_ba_data = download_data([ypfd_ba_ticker], start_date, end_date, compression=compression)
-                    ypf_data = download_data([ypf_ticker], start_date, end_date, compression=compression)
+                    if apply_ratio:
+                        st.subheader("🔄 Aplicando ajuste por ratio YPFD.BA/YPF (CCL)")
+                        ypfd_ba_ticker = "YPFD.BA"
+                        ypf_ticker = "YPF"
+                        ypfd_ba_data = download_data([ypfd_ba_ticker], start_date, end_date, compression=compression)
+                        ypf_data = download_data([ypf_ticker], start_date, end_date, compression=compression)
 
-                    if ypfd_ba_data is not None and ypf_data is not None:
-                        close_col_ypfd = f"Close {ypfd_ba_ticker}"
-                        close_col_ypf = f"Close {ypf_ticker}"
+                        if ypfd_ba_data is not None and ypf_data is not None:
+                            close_col_ypfd = f"Close {ypfd_ba_ticker}"
+                            close_col_ypf = f"Close {ypf_ticker}"
 
-                        if close_col_ypfd in ypfd_ba_data.columns and close_col_ypf in ypf_data.columns:
-                            ypfd_ba_data = ypfd_ba_data.fillna(method='ffill').fillna(method='bfill')
-                            ypf_data = ypf_data.fillna(method='ffill').fillna(method='bfill')
-                            ratio = ypfd_ba_data[close_col_ypfd] / ypf_data[close_col_ypf]
-                            ratio = ratio.reindex(data.index).fillna(method='ffill').fillna(method='bfill')
+                            if close_col_ypfd in ypfd_ba_data.columns and close_col_ypf in ypf_data.columns:
+                                ypfd_ba_data = ypfd_ba_data.fillna(method='ffill').fillna(method='bfill')
+                                ypf_data = ypf_data.fillna(method='ffill').fillna(method='bfill')
+                                ratio = ypfd_ba_data[close_col_ypfd] / ypf_data[close_col_ypf]
+                                ratio = ratio.reindex(data.index).fillna(method='ffill').fillna(method='bfill')
 
-                            data['Close Ajustado'] = data[price_column] / ratio
-                            price_column = 'Close Ajustado'
+                                data['Close Ajustado'] = data[price_column] / ratio
+                                price_column = 'Close Ajustado'
+                            else:
+                                st.error(f"No se encontraron columnas de precio válidas para {ypfd_ba_ticker} o {ypf_ticker}.")
                         else:
-                            st.error(f"No se encontraron columnas de precio válidas para {ypfd_ba_ticker} o {ypf_ticker}.")
+                            st.error("No se pudieron descargar los datos necesarios para aplicar el ratio.")
+
+                    # Calcular retornos
+                    data['Returns'] = calculate_returns(data, price_column)
+
+                    # Visualización 1: Precio Histórico
+                    st.write(f"### 📈 Precio Histórico ({compression})")
+                    fig = go.Figure()
+                    fig.add_trace(go.Scatter(x=data.index, y=data[price_column], mode='lines', name='Precio'))
+                    fig.add_annotation(text="MTaurus. X: mtaurus_ok", xref="paper", yref="paper", x=0.95, y=0.05, showarrow=False, font=dict(size=14, color="gray"), opacity=0.5)
+                    fig.update_layout(
+                        title=f"Precio Histórico de {ticker} ({compression})",
+                        xaxis_title="Fecha", yaxis_title="Precio", legend_title="Leyenda", template="plotly_dark", hovermode="x unified"
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
+
+                    # [Rest of tab1 visualizations unchanged: historical returns, Seaborn histogram, Plotly histogram]
+                    # Visualización 2: Retornos Históricos
+                    st.write(f"### 📉 Retornos Históricos ({compression})")
+                    if data['Returns'].dropna().empty:
+                        st.error("No hay datos válidos de retornos para graficar.")
                     else:
-                        st.error("No se pudieron descargar los datos necesarios para aplicar el ratio.")
+                        fig_returns = go.Figure()
+                        fig_returns.add_trace(go.Scatter(
+                            x=data.index, 
+                            y=data['Returns'], 
+                            mode='lines', 
+                            name='Retornos (%)',
+                            line=dict(color='lightgrey')
+                        ))
 
-                # Calcular retornos
-                data['Returns'] = calculate_returns(data, price_column)
+                        historical_mean = data['Returns'].mean()
+                        if not pd.isna(historical_mean):
+                            fig_returns.add_shape(
+                                type="line", 
+                                x0=data.index.min(), 
+                                x1=data.index.max(), 
+                                y0=historical_mean, 
+                                y1=historical_mean,
+                                line=dict(color="lightblue", width=1, dash="dash"),
+                            )
+                            fig_returns.add_trace(go.Scatter(
+                                x=[None], y=[None], mode='lines',
+                                line=dict(color="lightblue", width=1, dash="dash"),
+                                name=f"Promedio: {historical_mean:.2f}%",
+                                showlegend=True,
+                                opacity=0
+                            ))
+                            fig_returns.add_annotation(
+                                x=data.index.max(), 
+                                y=historical_mean, 
+                                text=f"Promedio: {historical_mean:.2f}%",
+                                showarrow=True, 
+                                arrowhead=1, 
+                                ax=20, 
+                                ay=-20, 
+                                font=dict(color="lightblue")
+                            )
 
-                # Visualización 1: Precio Histórico
-                st.write(f"### 📈 Precio Histórico ({compression})")
-                fig = go.Figure()
-                fig.add_trace(go.Scatter(x=data.index, y=data[price_column], mode='lines', name='Precio'))
-                fig.add_annotation(text="MTaurus. X: mtaurus_ok", xref="paper", yref="paper", x=0.95, y=0.05, showarrow=False, font=dict(size=14, color="gray"), opacity=0.5)
-                fig.update_layout(
-                    title=f"Precio Histórico de {ticker} ({compression})",
-                    xaxis_title="Fecha", yaxis_title="Precio", legend_title="Leyenda", template="plotly_dark", hovermode="x unified"
-                )
-                st.plotly_chart(fig, use_container_width=True)
+                        lower_percentile = st.slider("Seleccione el percentil inferior", min_value=1, max_value=49, value=5, key="lower_percentile")
+                        upper_percentile = st.slider("Seleccione el percentil superior", min_value=51, max_value=99, value=95, key="upper_percentile")
 
-                # [Rest of tab1 visualizations unchanged: historical returns, Seaborn histogram, Plotly histogram]
-                # Visualización 2: Retornos Históricos
-                st.write(f"### 📉 Retornos Históricos ({compression})")
-                if data['Returns'].dropna().empty:
-                    st.error("No hay datos válidos de retornos para graficar.")
-                else:
-                    fig_returns = go.Figure()
-                    fig_returns.add_trace(go.Scatter(
-                        x=data.index, 
-                        y=data['Returns'], 
-                        mode='lines', 
-                        name='Retornos (%)',
-                        line=dict(color='lightgrey')
-                    ))
+                        returns_data = data['Returns'].dropna()
+                        lower_value = np.percentile(returns_data, lower_percentile)
+                        upper_value = np.percentile(returns_data, upper_percentile)
 
-                    historical_mean = data['Returns'].mean()
-                    if not pd.isna(historical_mean):
                         fig_returns.add_shape(
                             type="line", 
                             x0=data.index.min(), 
                             x1=data.index.max(), 
-                            y0=historical_mean, 
-                            y1=historical_mean,
-                            line=dict(color="lightblue", width=1, dash="dash"),
+                            y0=lower_value, 
+                            y1=lower_value,
+                            line=dict(color="red", width=1, dash="dash"),
                         )
                         fig_returns.add_trace(go.Scatter(
                             x=[None], y=[None], mode='lines',
-                            line=dict(color="lightblue", width=1, dash="dash"),
-                            name=f"Promedio: {historical_mean:.2f}%",
+                            line=dict(color="red", width=1, dash="dash"),
+                            name=f"P{lower_percentile}: {lower_value:.2f}%",
                             showlegend=True,
                             opacity=0
                         ))
                         fig_returns.add_annotation(
                             x=data.index.max(), 
-                            y=historical_mean, 
-                            text=f"Promedio: {historical_mean:.2f}%",
+                            y=lower_value, 
+                            text=f"P{lower_percentile}: {lower_value:.2f}%",
+                            showarrow=True, 
+                            arrowhead=1, 
+                            ax=20, 
+                            ay=20, 
+                            font=dict(color="red")
+                        )
+
+                        fig_returns.add_shape(
+                            type="line", 
+                            x0=data.index.min(), 
+                            x1=data.index.max(), 
+                            y0=upper_value, 
+                            y1=upper_value,
+                            line=dict(color="green", width=1, dash="dash"),
+                        )
+                        fig_returns.add_trace(go.Scatter(
+                            x=[None], y=[None], mode='lines',
+                            line=dict(color="green", width=1, dash="dash"),
+                            name=f"P{upper_percentile}: {upper_value:.2f}%",
+                            showlegend=True,
+                            opacity=0
+                        ))
+                        fig_returns.add_annotation(
+                            x=data.index.max(), 
+                            y=upper_value, 
+                            text=f"P{upper_percentile}: {upper_value:.2f}%",
                             showarrow=True, 
                             arrowhead=1, 
                             ax=20, 
                             ay=-20, 
-                            font=dict(color="lightblue")
+                            font=dict(color="green")
                         )
 
-                    lower_percentile = st.slider("Seleccione el percentil inferior", min_value=1, max_value=49, value=5, key="lower_percentile")
-                    upper_percentile = st.slider("Seleccione el percentil superior", min_value=51, max_value=99, value=95, key="upper_percentile")
+                        fig_returns.add_shape(
+                            type="line", 
+                            x0=data.index.min(), 
+                            x1=data.index.max(), 
+                            y0=0, 
+                            y1=0, 
+                            line=dict(color="red", width=2)
+                        )
+                        fig_returns.add_trace(go.Scatter(
+                            x=[None], y=[None], mode='lines',
+                            line=dict(color="red", width=2),
+                            name="Línea Cero",
+                            showlegend=True,
+                            opacity=0
+                        ))
 
-                    returns_data = data['Returns'].dropna()
-                    lower_value = np.percentile(returns_data, lower_percentile)
-                    upper_value = np.percentile(returns_data, upper_percentile)
+                        fig_returns.add_annotation(
+                            text="MTaurus. X: mtaurus_ok", 
+                            xref="paper", 
+                            yref="paper", 
+                            x=0.95, 
+                            y=0.05,
+                            showarrow=False, 
+                            font=dict(size=14, color="gray"), 
+                            opacity=0.5
+                        )
 
-                    fig_returns.add_shape(
-                        type="line", 
-                        x0=data.index.min(), 
-                        x1=data.index.max(), 
-                        y0=lower_value, 
-                        y1=lower_value,
-                        line=dict(color="red", width=1, dash="dash"),
-                    )
-                    fig_returns.add_trace(go.Scatter(
-                        x=[None], y=[None], mode='lines',
-                        line=dict(color="red", width=1, dash="dash"),
-                        name=f"P{lower_percentile}: {lower_value:.2f}%",
-                        showlegend=True,
-                        opacity=0
-                    ))
-                    fig_returns.add_annotation(
-                        x=data.index.max(), 
-                        y=lower_value, 
-                        text=f"P{lower_percentile}: {lower_value:.2f}%",
-                        showarrow=True, 
-                        arrowhead=1, 
-                        ax=20, 
-                        ay=20, 
-                        font=dict(color="red")
-                    )
+                        fig_returns.update_layout(
+                            title=f"Retornos Históricos de {ticker} ({compression})",
+                            xaxis_title="Fecha", 
+                            yaxis_title="Retornos (%)", 
+                            legend_title="Leyenda",
+                            template="plotly_dark", 
+                            hovermode="x unified",
+                            showlegend=True
+                        )
+                        st.plotly_chart(fig_returns, use_container_width=True)
 
-                    fig_returns.add_shape(
-                        type="line", 
-                        x0=data.index.min(), 
-                        x1=data.index.max(), 
-                        y0=upper_value, 
-                        y1=upper_value,
-                        line=dict(color="green", width=1, dash="dash"),
-                    )
-                    fig_returns.add_trace(go.Scatter(
-                        x=[None], y=[None], mode='lines',
-                        line=dict(color="green", width=1, dash="dash"),
-                        name=f"P{upper_percentile}: {upper_value:.2f}%",
-                        showlegend=True,
-                        opacity=0
-                    ))
-                    fig_returns.add_annotation(
-                        x=data.index.max(), 
-                        y=upper_value, 
-                        text=f"P{upper_percentile}: {upper_value:.2f}%",
-                        showarrow=True, 
-                        arrowhead=1, 
-                        ax=20, 
-                        ay=-20, 
-                        font=dict(color="green")
-                    )
-
-                    fig_returns.add_shape(
-                        type="line", 
-                        x0=data.index.min(), 
-                        x1=data.index.max(), 
-                        y0=0, 
-                        y1=0, 
-                        line=dict(color="red", width=2)
-                    )
-                    fig_returns.add_trace(go.Scatter(
-                        x=[None], y=[None], mode='lines',
-                        line=dict(color="red", width=2),
-                        name="Línea Cero",
-                        showlegend=True,
-                        opacity=0
-                    ))
-
-                    fig_returns.add_annotation(
-                        text="MTaurus. X: mtaurus_ok", 
-                        xref="paper", 
-                        yref="paper", 
-                        x=0.95, 
-                        y=0.05,
-                        showarrow=False, 
-                        font=dict(size=14, color="gray"), 
-                        opacity=0.5
-                    )
-
-                    fig_returns.update_layout(
-                        title=f"Retornos Históricos de {ticker} ({compression})",
-                        xaxis_title="Fecha", 
-                        yaxis_title="Retornos (%)", 
-                        legend_title="Leyenda",
+                    # Visualización 3: Histograma con Seaborn/Matplotlib
+                    st.write(f"### 📊 Histograma de Retornos con Percentiles ({compression})")
+                    percentiles = [95, 85, 75, 50, 25, 15, 5]
+                    percentile_values = np.percentile(data['Returns'].dropna(), percentiles)
+                    
+                    st.write("#### Seleccionar fechas específicas para destacar en el histograma")
+                    num_dates = st.number_input("Número de fechas a destacar", min_value=0, max_value=10, value=0, key="num_dates_hist")
+                    selected_dates = []
+                    returns_values = []
+                    if num_dates > 0:
+                        for i in range(num_dates):
+                            date = st.date_input(
+                                f"Seleccione la fecha {i+1}",
+                                value=data.index[-1],
+                                min_value=data.index[0],
+                                max_value=data.index[-1],
+                                key=f"hist_date_{i}"
+                            )
+                            date = pd.to_datetime(date)
+                            if date in data.index:
+                                selected_dates.append(date)
+                                ret_value = data.loc[date, 'Returns']
+                                if not pd.isna(ret_value):
+                                    returns_values.append(ret_value)
+                                else:
+                                    st.warning(f"No hay datos de retornos para la fecha {date.strftime('%Y-%m-%d')}.")
+                            else:
+                                st.warning(f"La fecha {date.strftime('%Y-%m-%d')} no está en el rango de datos.")
+                    
+                    fig, ax = plt.subplots(figsize=(10, 6))
+                    sns.histplot(data['Returns'].dropna(), kde=True, color='blue', bins=100, ax=ax)
+                    for percentile, value in zip(percentiles, percentile_values):
+                        ax.axvline(value, color='red', linestyle='--')
+                        ax.text(value, ax.get_ylim()[1] * 0.9, f'{percentile}º Percentil', color='red', rotation='vertical', verticalalignment='center', horizontalalignment='right')
+                    for date, ret_value in zip(selected_dates, returns_values):
+                        ax.axvline(ret_value, color='green', linestyle='-', alpha=0.5)
+                        ax.text(ret_value, ax.get_ylim()[1] * 0.95, f"{date.strftime('%Y-%m-%d')} {ret_value:.2f}%", 
+                                color='green', rotation='vertical', verticalalignment='center', horizontalalignment='left')
+                    ax.text(0.95, 0.05, "MTaurus. X: mtaurus_ok", fontsize=14, color='gray', ha='right', va='center', alpha=0.5, transform=fig.transFigure)
+                    ax.set_title(f'Retornos de {ticker} ({compression})')
+                    ax.set_xlabel('Retornos (%)')
+                    ax.set_ylabel('Frecuencia')
+                    plt.tight_layout()
+                    st.pyplot(fig)
+                    plt.close(fig)
+                    
+                    # Visualización 4: Histograma Personalizable con Plotly
+                    st.write(f"### 🎨 Personalización del Histograma ({compression})")
+                    num_bins = st.slider("Seleccione el número de bins para el histograma", min_value=10, max_value=100, value=50, key="bins_original")
+                    hist_color = st.color_picker("Elija un color para el histograma", value='#1f77b4', key="color_original")
+                    st.write(f"### 📊 Histograma de Retornos ({compression})")
+                    fig_hist = go.Figure()
+                    fig_hist.add_trace(go.Histogram(x=data['Returns'].dropna(), nbinsx=num_bins, marker_color=hist_color, opacity=0.75, name="Histograma"))
+                    for percentile, value in zip(percentiles, percentile_values):
+                        fig_hist.add_vline(x=value, line=dict(color="red", width=2, dash="dash"), 
+                                           annotation_text=f'{percentile}º Percentil', annotation_position="top", 
+                                           annotation=dict(textangle=-90, font=dict(color="red")))
+                    for i, (date, ret_value) in enumerate(zip(selected_dates, returns_values)):
+                        annotation_y_position = 0.95 - (i * 0.05)
+                        fig_hist.add_vline(x=ret_value, line=dict(color="green", width=2, dash="solid"))
+                        fig_hist.add_annotation(
+                            x=ret_value,
+                            y=annotation_y_position,
+                            yref="paper",
+                            text=f"{date.strftime('%Y-%m-%d')} {ret_value:.2f}%",
+                            showarrow=True,
+                            arrowhead=1,
+                            ax=10,
+                            ay=0,
+                            textangle=90,
+                            font=dict(color="green", size=10),
+                            align="right"
+                        )
+                    fig_hist.add_annotation(text="MTaurus. X: mtaurus_ok", xref="paper", yref="paper", x=0.95, y=0.05, 
+                                            showarrow=False, font=dict(size=14, color="gray"), opacity=0.5)
+                    fig_hist.update_layout(
+                        title=f'Histograma de Retornos de {ticker} ({compression})',
+                        xaxis_title='Retornos (%)', 
+                        yaxis_title='Frecuencia', 
+                        bargap=0.1, 
                         template="plotly_dark", 
                         hovermode="x unified",
-                        showlegend=True
+                        margin=dict(t=100),
                     )
-                    st.plotly_chart(fig_returns, use_container_width=True)
-
-                # Visualización 3: Histograma con Seaborn/Matplotlib
-                st.write(f"### 📊 Histograma de Retornos con Percentiles ({compression})")
-                percentiles = [95, 85, 75, 50, 25, 15, 5]
-                percentile_values = np.percentile(data['Returns'].dropna(), percentiles)
-                
-                st.write("#### Seleccionar fechas específicas para destacar en el histograma")
-                num_dates = st.number_input("Número de fechas a destacar", min_value=0, max_value=10, value=0, key="num_dates_hist")
-                selected_dates = []
-                returns_values = []
-                if num_dates > 0:
-                    for i in range(num_dates):
-                        date = st.date_input(
-                            f"Seleccione la fecha {i+1}",
-                            value=data.index[-1],
-                            min_value=data.index[0],
-                            max_value=data.index[-1],
-                            key=f"hist_date_{i}"
-                        )
-                        date = pd.to_datetime(date)
-                        if date in data.index:
-                            selected_dates.append(date)
-                            ret_value = data.loc[date, 'Returns']
-                            if not pd.isna(ret_value):
-                                returns_values.append(ret_value)
-                            else:
-                                st.warning(f"No hay datos de retornos para la fecha {date.strftime('%Y-%m-%d')}.")
-                        else:
-                            st.warning(f"La fecha {date.strftime('%Y-%m-%d')} no está en el rango de datos.")
-                
-                fig, ax = plt.subplots(figsize=(10, 6))
-                sns.histplot(data['Returns'].dropna(), kde=True, color='blue', bins=100, ax=ax)
-                for percentile, value in zip(percentiles, percentile_values):
-                    ax.axvline(value, color='red', linestyle='--')
-                    ax.text(value, ax.get_ylim()[1] * 0.9, f'{percentile}º Percentil', color='red', rotation='vertical', verticalalignment='center', horizontalalignment='right')
-                for date, ret_value in zip(selected_dates, returns_values):
-                    ax.axvline(ret_value, color='green', linestyle='-', alpha=0.5)
-                    ax.text(ret_value, ax.get_ylim()[1] * 0.95, f"{date.strftime('%Y-%m-%d')} {ret_value:.2f}%", 
-                            color='green', rotation='vertical', verticalalignment='center', horizontalalignment='left')
-                ax.text(0.95, 0.05, "MTaurus. X: mtaurus_ok", fontsize=14, color='gray', ha='right', va='center', alpha=0.5, transform=fig.transFigure)
-                ax.set_title(f'Retornos de {ticker} ({compression})')
-                ax.set_xlabel('Retornos (%)')
-                ax.set_ylabel('Frecuencia')
-                plt.tight_layout()
-                st.pyplot(fig)
-                plt.close(fig)
-                
-                # Visualización 4: Histograma Personalizable con Plotly
-                st.write(f"### 🎨 Personalización del Histograma ({compression})")
-                num_bins = st.slider("Seleccione el número de bins para el histograma", min_value=10, max_value=100, value=50, key="bins_original")
-                hist_color = st.color_picker("Elija un color para el histograma", value='#1f77b4', key="color_original")
-                st.write(f"### 📊 Histograma de Retornos ({compression})")
-                fig_hist = go.Figure()
-                fig_hist.add_trace(go.Histogram(x=data['Returns'].dropna(), nbinsx=num_bins, marker_color=hist_color, opacity=0.75, name="Histograma"))
-                for percentile, value in zip(percentiles, percentile_values):
-                    fig_hist.add_vline(x=value, line=dict(color="red", width=2, dash="dash"), 
-                                       annotation_text=f'{percentile}º Percentil', annotation_position="top", 
-                                       annotation=dict(textangle=-90, font=dict(color="red")))
-                for i, (date, ret_value) in enumerate(zip(selected_dates, returns_values)):
-                    annotation_y_position = 0.95 - (i * 0.05)
-                    fig_hist.add_vline(x=ret_value, line=dict(color="green", width=2, dash="solid"))
-                    fig_hist.add_annotation(
-                        x=ret_value,
-                        y=annotation_y_position,
-                        yref="paper",
-                        text=f"{date.strftime('%Y-%m-%d')} {ret_value:.2f}%",
-                        showarrow=True,
-                        arrowhead=1,
-                        ax=10,
-                        ay=0,
-                        textangle=90,
-                        font=dict(color="green", size=10),
-                        align="right"
-                    )
-                fig_hist.add_annotation(text="MTaurus. X: mtaurus_ok", xref="paper", yref="paper", x=0.95, y=0.05, 
-                                        showarrow=False, font=dict(size=14, color="gray"), opacity=0.5)
-                fig_hist.update_layout(
-                    title=f'Histograma de Retornos de {ticker} ({compression})',
-                    xaxis_title='Retornos (%)', 
-                    yaxis_title='Frecuencia', 
-                    bargap=0.1, 
-                    template="plotly_dark", 
-                    hovermode="x unified",
-                    margin=dict(t=100),
-                )
-                st.plotly_chart(fig_hist, use_container_width=True)
+                    st.plotly_chart(fig_hist, use_container_width=True)
     else:
         st.warning("⚠️ Por favor, ingrese un ticker o una expresión válida.")
 
