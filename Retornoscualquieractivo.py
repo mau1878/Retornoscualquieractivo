@@ -37,9 +37,10 @@ def evaluate_ticker_expression(expression, data_dict, index):
     - pd.Series with the evaluated prices, or None if evaluation fails
     """
     try:
-        # Extract tickers from the expression (match letters, numbers, and dots, but require at least one letter)
-        tickers = set(re.findall(r'[A-Za-z][A-Za-z0-9\._]*', expression))
-        tickers = [t for t in tickers if t in data_dict]
+        # Extract potential tickers (start with letter, allow letters, numbers, dots)
+        potential_tickers = set(re.findall(r'\b[A-Za-z][A-Za-z0-9\._]*\b', expression))
+        # Only include tickers that exist in data_dict
+        tickers = [t for t in potential_tickers if t in data_dict]
         
         if not tickers:
             st.error("No se encontraron tickers válidos en la expresión.")
@@ -269,13 +270,23 @@ with tab1:
     if input_type == "Ticker único":
         ticker = st.text_input("🖊️ Ingrese el símbolo del ticker", value="AAPL", key="ticker_original").upper()
         expression = None
-        tickers = [ticker] if ticker else []
+        tickers = [ticker] if ticker and re.match(r'^[A-Za-z][A-Za-z0-9\._]*$', ticker) else []
     else:
         expression = st.text_input("🖊️ Ingrese la expresión (e.g., GGAL.BA*10/GGAL)", value="GGAL.BA*10/GGAL", key="expression_original")
-        tickers = set(re.findall(r'[A-Za-z0-9\._]+', expression)) if expression else []
-        ticker = "Expresión Personalizada"
+        # Extract tickers using regex, exclude pure numbers
+        potential_tickers = re.findall(r'\b[A-Za-z][A-Za-z0-9\._]*\b', expression) if expression else []
+        # Validate tickers by attempting a quick download
+        tickers = []
+        for t in set(potential_tickers):
+            try:
+                df = yf.download(t, start='2000-01-01', end='2000-01-02', progress=False)
+                if not df.empty:
+                    tickers.append(t)
+            except:
+                continue
+        ticker = "Expresión Personalizada" if expression else ""
     
-    if tickers or expression:
+    if tickers:
         start_date = st.date_input(
             "📅 Seleccione la fecha de inicio",
             value=pd.to_datetime('2000-01-01'),
@@ -342,6 +353,7 @@ with tab1:
                 )
                 st.plotly_chart(fig, use_container_width=True)
 
+                # [Rest of tab1 visualizations unchanged: historical returns, Seaborn histogram, Plotly histogram]
                 # Visualización 2: Retornos Históricos
                 st.write(f"### 📉 Retornos Históricos ({compression})")
                 if data['Returns'].dropna().empty:
