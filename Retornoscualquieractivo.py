@@ -114,24 +114,26 @@ def download_data(tickers, start, end, compression='Daily', expression=None):
         # Resample data based on compression
         if compression == 'Weekly':
             rule = 'W'
-            agg_dict = {
-                f'Open {ticker}': 'first',
-                f'High {ticker}': 'max',
-                f'Low {ticker}': 'min',
-                f'Close {ticker}': 'last',
-                f'Volume {ticker}': 'sum'
-                for ticker in tickers
-            }
+            agg_dict = {}
+            for ticker in tickers:
+                agg_dict.update({
+                    f'Open {ticker}': 'first',
+                    f'High {ticker}': 'max',
+                    f'Low {ticker}': 'min',
+                    f'Close {ticker}': 'last',
+                    f'Volume {ticker}': 'sum'
+                })
         elif compression == 'Monthly':
             rule = 'M'
-            agg_dict = {
-                f'Open {ticker}': 'first',
-                f'High {ticker}': 'max',
-                f'Low {ticker}': 'min',
-                f'Close {ticker}': 'last',
-                f'Volume {ticker}': 'sum'
-                for ticker in tickers
-            }
+            agg_dict = {}
+            for ticker in tickers:
+                agg_dict.update({
+                    f'Open {ticker}': 'first',
+                    f'High {ticker}': 'max',
+                    f'Low {ticker}': 'min',
+                    f'Close {ticker}': 'last',
+                    f'Volume {ticker}': 'sum'
+                })
         else:
             rule = 'D'
             agg_dict = None
