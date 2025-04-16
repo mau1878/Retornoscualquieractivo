@@ -296,6 +296,33 @@ with tab1:
         compression = st.selectbox("📅 Seleccione la compresión de datos", ["Daily", "Weekly", "Monthly"], key="compression_original")
         apply_ratio = st.checkbox("🔄 Ajustar precio por el ratio YPFD.BA/YPF (CCL)", key="ratio_original")
 
+        # Outlier threshold inputs
+        st.write("### Filtrar valores extremos (outliers) para las visualizaciones")
+        filter_outliers = st.checkbox("Excluir valores extremos de los gráficos", value=False, key="filter_outliers")
+        if filter_outliers:
+            col1, col2 = st.columns(2)
+            with col1:
+                lower_bound = st.number_input(
+                    "Límite inferior para retornos (%)",
+                    min_value=-1000.0,
+                    max_value=0.0,
+                    value=-100.0,
+                    step=1.0,
+                    key="lower_bound"
+                )
+            with col2:
+                upper_bound = st.number_input(
+                    "Límite superior para retornos (%)",
+                    min_value=0.0,
+                    max_value=1000.0,
+                    value=100.0,
+                    step=1.0,
+                    key="upper_bound"
+                )
+        else:
+            lower_bound = None
+            upper_bound = None
+
         start_date = pd.to_datetime(start_date)
         end_date = pd.to_datetime(end_date)
 
@@ -335,6 +362,14 @@ with tab1:
                     # Calcular retornos
                     data['Returns'] = calculate_returns(data, price_column)
 
+                    # Apply outlier filtering for visualizations
+                    if filter_outliers and lower_bound is not None and upper_bound is not None:
+                        plot_data = data[(data['Returns'] >= lower_bound) & (data['Returns'] <= upper_bound)].copy()
+                        if plot_data['Returns'].dropna().empty:
+                            st.warning("⚠️ Los límites de outliers excluyen todos los datos de retornos. Ajuste los límites.")
+                    else:
+                        plot_data = data.copy()
+
                     # Visualización 1: Precio Histórico
                     st.write(f"### 📈 Precio Histórico ({compression})")
                     fig = go.Figure()
@@ -346,27 +381,26 @@ with tab1:
                     )
                     st.plotly_chart(fig, use_container_width=True)
 
-                    # [Rest of tab1 visualizations unchanged: historical returns, Seaborn histogram, Plotly histogram]
                     # Visualización 2: Retornos Históricos
                     st.write(f"### 📉 Retornos Históricos ({compression})")
-                    if data['Returns'].dropna().empty:
-                        st.error("No hay datos válidos de retornos para graficar.")
+                    if plot_data['Returns'].dropna().empty:
+                        st.error("No hay datos válidos de retornos para graficar después de filtrar outliers.")
                     else:
                         fig_returns = go.Figure()
                         fig_returns.add_trace(go.Scatter(
-                            x=data.index, 
-                            y=data['Returns'], 
+                            x=plot_data.index, 
+                            y=plot_data['Returns'], 
                             mode='lines', 
                             name='Retornos (%)',
                             line=dict(color='lightgrey')
                         ))
 
-                        historical_mean = data['Returns'].mean()
+                        historical_mean = plot_data['Returns'].mean()
                         if not pd.isna(historical_mean):
                             fig_returns.add_shape(
                                 type="line", 
-                                x0=data.index.min(), 
-                                x1=data.index.max(), 
+                                x0=plot_data.index.min(), 
+                                x1=plot_data.index.max(), 
                                 y0=historical_mean, 
                                 y1=historical_mean,
                                 line=dict(color="lightblue", width=1, dash="dash"),
@@ -379,7 +413,7 @@ with tab1:
                                 opacity=0
                             ))
                             fig_returns.add_annotation(
-                                x=data.index.max(), 
+                                x=plot_data.index.max(), 
                                 y=historical_mean, 
                                 text=f"Promedio: {historical_mean:.2f}%",
                                 showarrow=True, 
@@ -392,66 +426,67 @@ with tab1:
                         lower_percentile = st.slider("Seleccione el percentil inferior", min_value=1, max_value=49, value=5, key="lower_percentile")
                         upper_percentile = st.slider("Seleccione el percentil superior", min_value=51, max_value=99, value=95, key="upper_percentile")
 
-                        returns_data = data['Returns'].dropna()
-                        lower_value = np.percentile(returns_data, lower_percentile)
-                        upper_value = np.percentile(returns_data, upper_percentile)
+                        returns_data = plot_data['Returns'].dropna()
+                        if not returns_data.empty:
+                            lower_value = np.percentile(returns_data, lower_percentile)
+                            upper_value = np.percentile(returns_data, upper_percentile)
+
+                            fig_returns.add_shape(
+                                type="line", 
+                                x0=plot_data.index.min(), 
+                                x1=plot_data.index.max(), 
+                                y0=lower_value, 
+                                y1=lower_value,
+                                line=dict(color="red", width=1, dash="dash"),
+                            )
+                            fig_returns.add_trace(go.Scatter(
+                                x=[None], y=[None], mode='lines',
+                                line=dict(color="red", width=1, dash="dash"),
+                                name=f"P{lower_percentile}: {lower_value:.2f}%",
+                                showlegend=True,
+                                opacity=0
+                            ))
+                            fig_returns.add_annotation(
+                                x=plot_data.index.max(), 
+                                y=lower_value, 
+                                text=f"P{lower_percentile}: {lower_value:.2f}%",
+                                showarrow=True, 
+                                arrowhead=1, 
+                                ax=20, 
+                                ay=20, 
+                                font=dict(color="red")
+                            )
+
+                            fig_returns.add_shape(
+                                type="line", 
+                                x0=plot_data.index.min(), 
+                                x1=plot_data.index.max(), 
+                                y0=upper_value, 
+                                y1=upper_value,
+                                line=dict(color="green", width=1, dash="dash"),
+                            )
+                            fig_returns.add_trace(go.Scatter(
+                                x=[None], y=[None], mode='lines',
+                                line=dict(color="green", width=1, dash="dash"),
+                                name=f"P{upper_percentile}: {upper_value:.2f}%",
+                                showlegend=True,
+                                opacity=0
+                            ))
+                            fig_returns.add_annotation(
+                                x=plot_data.index.max(), 
+                                y=upper_value, 
+                                text=f"P{upper_percentile}: {upper_value:.2f}%",
+                                showarrow=True, 
+                                arrowhead=1, 
+                                ax=20, 
+                                ay=-20, 
+                                font=dict(color="green")
+                            )
 
                         fig_returns.add_shape(
                             type="line", 
-                            x0=data.index.min(), 
-                            x1=data.index.max(), 
-                            y0=lower_value, 
-                            y1=lower_value,
-                            line=dict(color="red", width=1, dash="dash"),
-                        )
-                        fig_returns.add_trace(go.Scatter(
-                            x=[None], y=[None], mode='lines',
-                            line=dict(color="red", width=1, dash="dash"),
-                            name=f"P{lower_percentile}: {lower_value:.2f}%",
-                            showlegend=True,
-                            opacity=0
-                        ))
-                        fig_returns.add_annotation(
-                            x=data.index.max(), 
-                            y=lower_value, 
-                            text=f"P{lower_percentile}: {lower_value:.2f}%",
-                            showarrow=True, 
-                            arrowhead=1, 
-                            ax=20, 
-                            ay=20, 
-                            font=dict(color="red")
-                        )
-
-                        fig_returns.add_shape(
-                            type="line", 
-                            x0=data.index.min(), 
-                            x1=data.index.max(), 
-                            y0=upper_value, 
-                            y1=upper_value,
-                            line=dict(color="green", width=1, dash="dash"),
-                        )
-                        fig_returns.add_trace(go.Scatter(
-                            x=[None], y=[None], mode='lines',
-                            line=dict(color="green", width=1, dash="dash"),
-                            name=f"P{upper_percentile}: {upper_value:.2f}%",
-                            showlegend=True,
-                            opacity=0
-                        ))
-                        fig_returns.add_annotation(
-                            x=data.index.max(), 
-                            y=upper_value, 
-                            text=f"P{upper_percentile}: {upper_value:.2f}%",
-                            showarrow=True, 
-                            arrowhead=1, 
-                            ax=20, 
-                            ay=-20, 
-                            font=dict(color="green")
-                        )
-
-                        fig_returns.add_shape(
-                            type="line", 
-                            x0=data.index.min(), 
-                            x1=data.index.max(), 
+                            x0=plot_data.index.min(), 
+                            x1=plot_data.index.max(), 
                             y0=0, 
                             y1=0, 
                             line=dict(color="red", width=2)
@@ -489,7 +524,7 @@ with tab1:
                     # Visualización 3: Histograma con Seaborn/Matplotlib
                     st.write(f"### 📊 Histograma de Retornos con Percentiles ({compression})")
                     percentiles = [95, 85, 75, 50, 25, 15, 5]
-                    percentile_values = np.percentile(data['Returns'].dropna(), percentiles)
+                    percentile_values = np.percentile(plot_data['Returns'].dropna(), percentiles) if not plot_data['Returns'].dropna().empty else []
                     
                     st.write("#### Seleccionar fechas específicas para destacar en el histograma")
                     num_dates = st.number_input("Número de fechas a destacar", min_value=0, max_value=10, value=0, key="num_dates_hist")
@@ -499,15 +534,15 @@ with tab1:
                         for i in range(num_dates):
                             date = st.date_input(
                                 f"Seleccione la fecha {i+1}",
-                                value=data.index[-1],
-                                min_value=data.index[0],
-                                max_value=data.index[-1],
+                                value=plot_data.index[-1] if not plot_data.empty else pd.to_datetime('today'),
+                                min_value=plot_data.index[0] if not plot_data.empty else pd.to_datetime('1900-01-01'),
+                                max_value=plot_data.index[-1] if not plot_data.empty else pd.to_datetime('today'),
                                 key=f"hist_date_{i}"
                             )
                             date = pd.to_datetime(date)
-                            if date in data.index:
+                            if date in plot_data.index:
                                 selected_dates.append(date)
-                                ret_value = data.loc[date, 'Returns']
+                                ret_value = plot_data.loc[date, 'Returns']
                                 if not pd.isna(ret_value):
                                     returns_values.append(ret_value)
                                 else:
@@ -515,65 +550,68 @@ with tab1:
                             else:
                                 st.warning(f"La fecha {date.strftime('%Y-%m-%d')} no está en el rango de datos.")
                     
-                    fig, ax = plt.subplots(figsize=(10, 6))
-                    sns.histplot(data['Returns'].dropna(), kde=True, color='blue', bins=100, ax=ax)
-                    for percentile, value in zip(percentiles, percentile_values):
-                        ax.axvline(value, color='red', linestyle='--')
-                        ax.text(value, ax.get_ylim()[1] * 0.9, f'{percentile}º Percentil', color='red', rotation='vertical', verticalalignment='center', horizontalalignment='right')
-                    for date, ret_value in zip(selected_dates, returns_values):
-                        ax.axvline(ret_value, color='green', linestyle='-', alpha=0.5)
-                        ax.text(ret_value, ax.get_ylim()[1] * 0.95, f"{date.strftime('%Y-%m-%d')} {ret_value:.2f}%", 
-                                color='green', rotation='vertical', verticalalignment='center', horizontalalignment='left')
-                    ax.text(0.95, 0.05, "MTaurus. X: mtaurus_ok", fontsize=14, color='gray', ha='right', va='center', alpha=0.5, transform=fig.transFigure)
-                    ax.set_title(f'Retornos de {ticker} ({compression})')
-                    ax.set_xlabel('Retornos (%)')
-                    ax.set_ylabel('Frecuencia')
-                    plt.tight_layout()
-                    st.pyplot(fig)
-                    plt.close(fig)
+                    if plot_data['Returns'].dropna().empty:
+                        st.error("No hay datos válidos de retornos para graficar después de filtrar outliers.")
+                    else:
+                        fig, ax = plt.subplots(figsize=(10, 6))
+                        sns.histplot(plot_data['Returns'].dropna(), kde=True, color='blue', bins=100, ax=ax)
+                        for percentile, value in zip(percentiles, percentile_values):
+                            ax.axvline(value, color='red', linestyle='--')
+                            ax.text(value, ax.get_ylim()[1] * 0.9, f'{percentile}º Percentil', color='red', rotation='vertical', verticalalignment='center', horizontalalignment='right')
+                        for date, ret_value in zip(selected_dates, returns_values):
+                            ax.axvline(ret_value, color='green', linestyle='-', alpha=0.5)
+                            ax.text(ret_value, ax.get_ylim()[1] * 0.95, f"{date.strftime('%Y-%m-%d')} {ret_value:.2f}%", 
+                                    color='green', rotation='vertical', verticalalignment='center', horizontalalignment='left')
+                        ax.text(0.95, 0.05, "MTaurus. X: mtaurus_ok", fontsize=14, color='gray', ha='right', va='center', alpha=0.5, transform=fig.transFigure)
+                        ax.set_title(f'Retornos de {ticker} ({compression})')
+                        ax.set_xlabel('Retornos (%)')
+                        ax.set_ylabel('Frecuencia')
+                        plt.tight_layout()
+                        st.pyplot(fig)
+                        plt.close(fig)
                     
                     # Visualización 4: Histograma Personalizable con Plotly
                     st.write(f"### 🎨 Personalización del Histograma ({compression})")
                     num_bins = st.slider("Seleccione el número de bins para el histograma", min_value=10, max_value=100, value=50, key="bins_original")
                     hist_color = st.color_picker("Elija un color para el histograma", value='#1f77b4', key="color_original")
                     st.write(f"### 📊 Histograma de Retornos ({compression})")
-                    fig_hist = go.Figure()
-                    fig_hist.add_trace(go.Histogram(x=data['Returns'].dropna(), nbinsx=num_bins, marker_color=hist_color, opacity=0.75, name="Histograma"))
-                    for percentile, value in zip(percentiles, percentile_values):
-                        fig_hist.add_vline(x=value, line=dict(color="red", width=2, dash="dash"), 
-                                           annotation_text=f'{percentile}º Percentil', annotation_position="top", 
-                                           annotation=dict(textangle=-90, font=dict(color="red")))
-                    for i, (date, ret_value) in enumerate(zip(selected_dates, returns_values)):
-                        annotation_y_position = 0.95 - (i * 0.05)
-                        fig_hist.add_vline(x=ret_value, line=dict(color="green", width=2, dash="solid"))
-                        fig_hist.add_annotation(
-                            x=ret_value,
-                            y=annotation_y_position,
-                            yref="paper",
-                            text=f"{date.strftime('%Y-%m-%d')} {ret_value:.2f}%",
-                            showarrow=True,
-                            arrowhead=1,
-                            ax=10,
-                            ay=0,
-                            textangle=90,
-                            font=dict(color="green", size=10),
-                            align="right"
+                    if plot_data['Returns'].dropna().empty:
+                        st.error("No hay datos válidos de retornos para graficar después de filtrar outliers.")
+                    else:
+                        fig_hist = go.Figure()
+                        fig_hist.add_trace(go.Histogram(x=plot_data['Returns'].dropna(), nbinsx=num_bins, marker_color=hist_color, opacity=0.75, name="Histograma"))
+                        for percentile, value in zip(percentiles, percentile_values):
+                            fig_hist.add_vline(x=value, line=dict(color="red", width=2, dash="dash"), 
+                                               annotation_text=f'{percentile}º Percentil', annotation_position="top", 
+                                               annotation=dict(textangle=-90, font=dict(color="red")))
+                        for i, (date, ret_value) in enumerate(zip(selected_dates, returns_values)):
+                            annotation_y_position = 0.95 - (i * 0.05)
+                            fig_hist.add_vline(x=ret_value, line=dict(color="green", width=2, dash="solid"))
+                            fig_hist.add_annotation(
+                                x=ret_value,
+                                y=annotation_y_position,
+                                yref="paper",
+                                text=f"{date.strftime('%Y-%m-%d')} {ret_value:.2f}%",
+                                showarrow=True,
+                                arrowhead=1,
+                                ax=10,
+                                ay=0,
+                                textangle=90,
+                                font=dict(color="green", size=10),
+                                align="right"
+                            )
+                        fig_hist.add_annotation(text="MTaurus. X: mtaurus_ok", xref="paper", yref="paper", x=0.95, y=0.05, 
+                                                showarrow=False, font=dict(size=14, color="gray"), opacity=0.5)
+                        fig_hist.update_layout(
+                            title=f'Histograma de Retornos de {ticker} ({compression})',
+                            xaxis_title='Retornos (%)', 
+                            yaxis_title='Frecuencia', 
+                            bargap=0.1, 
+                            template="plotly_dark", 
+                            hovermode="x unified",
+                            margin=dict(t=100),
                         )
-                    fig_hist.add_annotation(text="MTaurus. X: mtaurus_ok", xref="paper", yref="paper", x=0.95, y=0.05, 
-                                            showarrow=False, font=dict(size=14, color="gray"), opacity=0.5)
-                    fig_hist.update_layout(
-                        title=f'Histograma de Retornos de {ticker} ({compression})',
-                        xaxis_title='Retornos (%)', 
-                        yaxis_title='Frecuencia', 
-                        bargap=0.1, 
-                        template="plotly_dark", 
-                        hovermode="x unified",
-                        margin=dict(t=100),
-                    )
-                    st.plotly_chart(fig_hist, use_container_width=True)
-            else:
-                st.warning("⚠️ Por favor, ingrese un ticker o una expresión válida.")
-
+                        st.plotly_chart(fig_hist, use_container_width=True)
 # Pestaña 2: Análisis de Trading con Percentiles de Retornos
 with tab2:
     st.header("Análisis de Trading con Percentiles de Retornos")
