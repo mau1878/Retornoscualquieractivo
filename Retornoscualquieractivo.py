@@ -130,45 +130,26 @@ def download_data(tickers, start, end, compression='Daily', expression=None):
         # Resample data based on compression
         if compression == 'Weekly':
             rule = 'W'
-            agg_dict = {}
-            for ticker in tickers:
-                # Only include columns that exist in the DataFrame
-                available_columns = data_dict[ticker].columns
-                agg_dict.update({
-                    col: func for col, func in {
-                        f'Open {ticker}': 'first',
-                        f'High {ticker}': 'max',
-                        f'Low {ticker}': 'min',
-                        f'Close {ticker}': 'last',
-                        f'Volume {ticker}': 'sum'
-                    }.items() if col in available_columns
-                })
         elif compression == 'Monthly':
             rule = 'M'
-            agg_dict = {}
-            for ticker in tickers:
-                available_columns = data_dict[ticker].columns
-                agg_dict.update({
-                    col: func for col, func in {
-                        f'Open {ticker}': 'first',
-                        f'High {ticker}': 'max',
-                        f'Low {ticker}': 'min',
-                        f'Close {ticker}': 'last',
-                        f'Volume {ticker}': 'sum'
-                    }.items() if col in available_columns
-                })
         else:
             rule = 'D'
-            agg_dict = None
         
         if rule != 'D':
             for ticker in tickers:
+                # Build aggregation dictionary for this ticker only
+                available_columns = data_dict[ticker].columns
                 ticker_agg_dict = {
-                    key: value for key, value in agg_dict.items()
-                    if key.startswith((f'Open {ticker}', f'High {ticker}', f'Low {ticker}', f'Close {ticker}', f'Volume {ticker}'))
+                    col: func for col, func in {
+                        f'Open {ticker}': 'first',
+                        f'High {ticker}': 'max',
+                        f'Low {ticker}': 'min',
+                        f'Close {ticker}': 'last',
+                        f'Volume {ticker}': 'sum'
+                    }.items() if col in available_columns
                 }
                 if not ticker_agg_dict:
-                    st.error(f"No se encontraron columnas válidas para la agregación de {ticker}. Columnas disponibles: {data_dict[ticker].columns.tolist()}")
+                    st.error(f"No se encontraron columnas válidas para la agregación de {ticker}. Columnas disponibles: {available_columns.tolist()}")
                     return None
                 # Debug: Log aggregation dictionary
                 st.write(f"Agregación para {ticker}: {ticker_agg_dict}")
