@@ -19,8 +19,22 @@ st.set_page_config(
 
 # Función para aplanar las columnas MultiIndex
 def flatten_columns(df, ticker):
+    """
+    Flatten DataFrame columns and prepend ticker name to column names.
+    
+    Parameters:
+    - df: DataFrame from yf.download, possibly with MultiIndex or single-level columns
+    - ticker: String ticker symbol (e.g., 'YPFD.BA')
+    
+    Returns:
+    - DataFrame with columns renamed to 'Open {ticker}', 'Close {ticker}', etc.
+    """
     if isinstance(df.columns, pd.MultiIndex):
-        df.columns = [f"{col[0]} {col[1]}" for col in df.columns]
+        # Handle MultiIndex (multiple tickers)
+        df.columns = [f"{col[0]} {col[1]}" if col[1] else col[0] for col in df.columns]
+    else:
+        # Handle single-level columns (single ticker)
+        df.columns = [f"{col} {ticker}" for col in df.columns]
     return df
 
 # Función para evaluar expresiones con tickers
@@ -84,7 +98,7 @@ def download_data(tickers, start, end, compression='Daily', expression=None):
     - tickers: List of tickers or a single ticker string
     - start, end: Datetime for data range
     - compression: 'Daily', 'Weekly', or 'Monthly'
-    - expression: Optional string expression (e.g., "GGAL.BA*10/GGAL")
+    - expression: Optional string expression (e.g., "YPFD.BA/YPF")
     
     Returns:
     - DataFrame with price data or computed prices
@@ -100,6 +114,8 @@ def download_data(tickers, start, end, compression='Daily', expression=None):
                 st.error(f"No hay datos disponibles para el ticker **{ticker}** en el rango de fechas {start.strftime('%Y-%m-%d')} a {end.strftime('%Y-%m-%d')}. Verifique el ticker o el rango de fechas.")
                 return None
             df = flatten_columns(df, ticker)
+            # Debug: Log column names
+            st.write(f"Columnas para {ticker} después de flatten_columns: {df.columns.tolist()}")
             data_dict[ticker] = df
         
         # Determine the common index
@@ -116,23 +132,30 @@ def download_data(tickers, start, end, compression='Daily', expression=None):
             rule = 'W'
             agg_dict = {}
             for ticker in tickers:
+                # Only include columns that exist in the DataFrame
+                available_columns = data_dict[ticker].columns
                 agg_dict.update({
-                    f'Open {ticker}': 'first',
-                    f'High {ticker}': 'max',
-                    f'Low {ticker}': 'min',
-                    f'Close {ticker}': 'last',
-                    f'Volume {ticker}': 'sum'
+                    col: func for col, func in {
+                        f'Open {ticker}': 'first',
+                        f'High {ticker}': 'max',
+                        f'Low {ticker}': 'min',
+                        f'Close {ticker}': 'last',
+                        f'Volume {ticker}': 'sum'
+                    }.items() if col in available_columns
                 })
         elif compression == 'Monthly':
             rule = 'M'
             agg_dict = {}
             for ticker in tickers:
+                available_columns = data_dict[ticker].columns
                 agg_dict.update({
-                    f'Open {ticker}': 'first',
-                    f'High {ticker}': 'max',
-                    f'Low {ticker}': 'min',
-                    f'Close {ticker}': 'last',
-                    f'Volume {ticker}': 'sum'
+                    col: func for col, func in {
+                        f'Open {ticker}': 'first',
+                        f'High {ticker}': 'max',
+                        f'Low {ticker}': 'min',
+                        f'Close {ticker}': 'last',
+                        f'Volume {ticker}': 'sum'
+                    }.items() if col in available_columns
                 })
         else:
             rule = 'D'
@@ -144,6 +167,11 @@ def download_data(tickers, start, end, compression='Daily', expression=None):
                     key: value for key, value in agg_dict.items()
                     if key.startswith((f'Open {ticker}', f'High {ticker}', f'Low {ticker}', f'Close {ticker}', f'Volume {ticker}'))
                 }
+                if not ticker_agg_dict:
+                    st.error(f"No se encontraron columnas válidas para la agregación de {ticker}. Columnas disponibles: {data_dict[ticker].columns.tolist()}")
+                    return None
+                # Debug: Log aggregation dictionary
+                st.write(f"Agregación para {ticker}: {ticker_agg_dict}")
                 data_dict[ticker] = data_dict[ticker].resample(rule).agg(ticker_agg_dict).dropna()
             common_index = data_dict[tickers[0]].index
             for ticker in tickers[1:]:
