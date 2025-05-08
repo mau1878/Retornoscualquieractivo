@@ -609,7 +609,7 @@ with tab1:
                                         rotation=90,
                                         verticalalignment='center',
                                         horizontalalignment='right',
-                                        fontsize=10,
+                                        fontsize=25,
                                         weight='bold'
                                     )
                     
@@ -624,7 +624,7 @@ with tab1:
                                         rotation=90,
                                         verticalalignment='center',
                                         horizontalalignment='left',
-                                        fontsize=9,
+                                        fontsize=25,
                                         weight='medium'
                                     )
                     
@@ -632,7 +632,7 @@ with tab1:
                                 ax.text(
                                     0.95, 0.05,
                                     "MTaurus. X: mtaurus_ok",
-                                    fontsize=12,
+                                    fontsize=20,
                                     color='gray',
                                     ha='right',
                                     va='center',
@@ -642,8 +642,8 @@ with tab1:
                     
                                 # Customize titles and labels
                                 ax.set_title(f'Retornos de {ticker} ({compression})', fontsize=16, weight='bold', pad=15)
-                                ax.set_xlabel('Retornos (%)', fontsize=12)
-                                ax.set_ylabel('Densidad', fontsize=12)
+                                ax.set_xlabel('Retornos (%)', fontsize=20)
+                                ax.set_ylabel('Densidad', fontsize=20)
                     
                                 # Adjust grid and spines for a cleaner look
                                 ax.grid(True, which='both', linestyle='--', linewidth=0.5, alpha=0.7)
