@@ -576,7 +576,7 @@ with tab1:
                             try:
                                 # Set Seaborn style for a modern look
                                 sns.set_style("darkgrid")  # Options: 'whitegrid', 'darkgrid', 'white', 'dark'
-                                sns.set_context("notebook", font_scale=1.2)  # Adjust font scale for readability
+                                sns.set_context("notebook", font_scale=1.9)  # Adjust font scale for readability
                     
                                 # Create figure
                                 fig, ax = plt.subplots(figsize=(24, 14))  # Slightly larger for better visibility
