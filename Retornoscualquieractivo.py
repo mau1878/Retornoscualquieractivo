@@ -533,6 +533,7 @@ with tab1:
                     # Visualización 3: Histograma con Seaborn/Matplotlib
                     # Visualización 3: Histograma con Seaborn/Matplotlib (Estilizado)
                     # Visualización 3: Histograma con Seaborn/Matplotlib (Estilizado)
+                    # Visualización 3: Histograma con Seaborn/Matplotlib (Estilizado)
                     st.write(f"### 📊 Histograma de Retornos con Percentiles ({compression})")
                     percentiles = [95, 85, 75, 50, 25, 15, 5]
                     percentile_values = np.percentile(plot_data['Returns'].dropna(), percentiles) if not plot_data['Returns'].dropna().empty else []
@@ -569,6 +570,8 @@ with tab1:
                         returns_data = returns_data[np.isfinite(returns_data)]  # Remove inf/-inf
                         if returns_data.empty:
                             st.error("Los datos de retornos contienen solo valores inválidos (inf/-inf) después de la limpieza.")
+                        elif len(returns_data) < 2:
+                            st.error("Datos insuficientes para generar el histograma y la KDE (se requieren al menos 2 puntos válidos).")
                         else:
                             try:
                                 # Set Seaborn style for a modern look
@@ -583,12 +586,17 @@ with tab1:
                                     data=returns_data,
                                     kde=True,
                                     bins=100,
-                                    color='#1f77b4',  # Professional blue color
+                                    color='#1f77b4',  # Professional blue color for histogram
                                     alpha=0.6,  # Slight transparency for histogram bars
-                                    kde_kws={'color': '#ff7f0e', 'linewidth': 2},  # Simplified kde_kws
                                     stat='density',  # Normalize to density for better KDE scaling
                                     ax=ax
                                 )
+                    
+                                # Customize KDE line (find the line created by sns.histplot)
+                                for line in ax.get_lines():
+                                    if line.get_label() == '_kde':  # Seaborn labels the KDE line internally
+                                        line.set_color('#ff7f0e')  # Orange for KDE
+                                        line.set_linewidth(2)
                     
                                 # Add percentile lines
                                 for percentile, value in zip(percentiles, percentile_values):
@@ -650,11 +658,12 @@ with tab1:
                                 # Display in Streamlit
                                 st.pyplot(fig)
                     
-                                # Close figure to free memory
-                                plt.close(fig)
-                    
                             except Exception as e:
                                 st.error(f"Error al generar el histograma con KDE: {str(e)}")
+                    
+                            finally:
+                                # Close figure to free memory
+                                plt.close(fig)
                     
                     # Visualización 4: Histograma Personalizable con Plotly
                     st.write(f"### 🎨 Personalización del Histograma ({compression})")
