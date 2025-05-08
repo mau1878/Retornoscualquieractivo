@@ -579,7 +579,7 @@ with tab1:
                                 sns.set_context("notebook", font_scale=1.2)  # Adjust font scale for readability
                     
                                 # Create figure
-                                fig, ax = plt.subplots(figsize=(12, 7))  # Slightly larger for better visibility
+                                fig, ax = plt.subplots(figsize=(24, 14))  # Slightly larger for better visibility
                     
                                 # Plot histogram with KDE
                                 sns.histplot(
