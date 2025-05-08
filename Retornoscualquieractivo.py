@@ -531,6 +531,7 @@ with tab1:
                         st.plotly_chart(fig_returns, use_container_width=True)
 
                     # Visualización 3: Histograma con Seaborn/Matplotlib
+                    # Visualización 3: Histograma con Seaborn/Matplotlib (Estilizado)
                     st.write(f"### 📊 Histograma de Retornos con Percentiles ({compression})")
                     percentiles = [95, 85, 75, 50, 25, 15, 5]
                     percentile_values = np.percentile(plot_data['Returns'].dropna(), percentiles) if not plot_data['Returns'].dropna().empty else []
@@ -562,21 +563,86 @@ with tab1:
                     if plot_data['Returns'].dropna().empty:
                         st.error("No hay datos válidos de retornos para graficar después de filtrar outliers.")
                     else:
-                        fig, ax = plt.subplots(figsize=(10, 6))
-                        sns.histplot(plot_data['Returns'].dropna(), kde=True, color='blue', bins=100, ax=ax)
+                        # Set Seaborn style for a modern look
+                        sns.set_style("darkgrid")  # Options: 'whitegrid', 'darkgrid', 'white', 'dark'
+                        sns.set_context("notebook", font_scale=1.2)  # Adjust font scale for readability
+                        
+                        # Create figure
+                        fig, ax = plt.subplots(figsize=(12, 7))  # Slightly larger for better visibility
+                        
+                        # Plot histogram with KDE
+                        sns.histplot(
+                            data=plot_data['Returns'].dropna(),
+                            kde=True,
+                            bins=100,
+                            color='#1f77b4',  # Professional blue color
+                            alpha=0.6,  # Slight transparency for histogram bars
+                            kde_kws={'color': '#ff7f0e', 'linewidth': 2, 'label': 'KDE'},  # Orange KDE line
+                            stat='density',  # Normalize to density for better KDE scaling
+                            ax=ax
+                        )
+                        
+                        # Add percentile lines
                         for percentile, value in zip(percentiles, percentile_values):
-                            ax.axvline(value, color='red', linestyle='--')
-                            ax.text(value, ax.get_ylim()[1] * 0.9, f'{percentile}º Percentil', color='red', rotation='vertical', verticalalignment='center', horizontalalignment='right')
+                            ax.axvline(value, color='#d62728', linestyle='--', linewidth=1.5)  # Red for percentiles
+                            ax.text(
+                                value, 
+                                ax.get_ylim()[1] * 0.85, 
+                                f'P{percentile}', 
+                                color='#d62728', 
+                                rotation=90, 
+                                verticalalignment='center', 
+                                horizontalalignment='right',
+                                fontsize=10, 
+                                weight='bold'
+                            )
+                        
+                        # Add lines for selected dates
                         for date, ret_value in zip(selected_dates, returns_values):
-                            ax.axvline(ret_value, color='green', linestyle='-', alpha=0.5)
-                            ax.text(ret_value, ax.get_ylim()[1] * 0.95, f"{date.strftime('%Y-%m-%d')} {ret_value:.2f}%", 
-                                    color='green', rotation='vertical', verticalalignment='center', horizontalalignment='left')
-                        ax.text(0.95, 0.05, "MTaurus. X: mtaurus_ok", fontsize=14, color='gray', ha='right', va='center', alpha=0.5, transform=fig.transFigure)
-                        ax.set_title(f'Retornos de {ticker} ({compression})')
-                        ax.set_xlabel('Retornos (%)')
-                        ax.set_ylabel('Frecuencia')
+                            ax.axvline(ret_value, color='#2ca02c', linestyle='-', alpha=0.7, linewidth=1.5)  # Green for dates
+                            ax.text(
+                                ret_value, 
+                                ax.get_ylim()[1] * 0.9, 
+                                f"{date.strftime('%Y-%m-%d')} ({ret_value:.2f}%)", 
+                                color='#2ca02c', 
+                                rotation=90, 
+                                verticalalignment='center', 
+                                horizontalalignment='left',
+                                fontsize=9, 
+                                weight='medium'
+                            )
+                        
+                        # Add watermark
+                        ax.text(
+                            0.95, 0.05, 
+                            "MTaurus. X: mtaurus_ok", 
+                            fontsize=12, 
+                            color='gray', 
+                            ha='right', 
+                            va='center', 
+                            alpha=0.5, 
+                            transform=fig.transFigure
+                        )
+                        
+                        # Customize titles and labels
+                        ax.set_title(f'Retornos de {ticker} ({compression})', fontsize=16, weight='bold', pad=15)
+                        ax.set_xlabel('Retornos (%)', fontsize=12)
+                        ax.set_ylabel('Densidad', fontsize=12)
+                        
+                        # Adjust grid and spines for a cleaner look
+                        ax.grid(True, which='both', linestyle='--', linewidth=0.5, alpha=0.7)
+                        ax.spines['top'].set_visible(False)
+                        ax.spines['right'].set_visible(False)
+                        ax.spines['left'].set_color('gray')
+                        ax.spines['bottom'].set_color('gray')
+                        
+                        # Tight layout to prevent clipping
                         plt.tight_layout()
+                        
+                        # Display in Streamlit
                         st.pyplot(fig)
+                        
+                        # Close figure to free memory
                         plt.close(fig)
                     
                     # Visualización 4: Histograma Personalizable con Plotly
