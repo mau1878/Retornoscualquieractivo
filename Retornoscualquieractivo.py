@@ -43,7 +43,7 @@ def evaluate_ticker_expression(expression, data_dict, index):
     Evaluate a mathematical expression involving tickers' closing prices.
     
     Parameters:
-    - expression: String, e.g., "GGAL.BA*10/GGAL"
+    - expression: String, e.g., "^SPX*10/AAPL"
     - data_dict: Dict of DataFrames, where keys are tickers and values are DataFrames with closing prices
     - index: DatetimeIndex to align the resulting series
     
@@ -51,8 +51,8 @@ def evaluate_ticker_expression(expression, data_dict, index):
     - pd.Series with the evaluated prices, or None if evaluation fails
     """
     try:
-        # Extract potential tickers (start with letter, allow letters, numbers, dots)
-        potential_tickers = set(re.findall(r'\b[A-Za-z][A-Za-z0-9\.^]*\b', expression))
+        # Extract potential tickers (start with ^ or letter, allow letters, numbers, dots)
+        potential_tickers = set(re.findall(r'\b[\^A-Za-z][A-Za-z0-9\.]*\b', expression))
         # Only include tickers that exist in data_dict
         tickers = [t for t in potential_tickers if t in data_dict]
         
@@ -67,12 +67,12 @@ def evaluate_ticker_expression(expression, data_dict, index):
             if close_col not in data_dict[ticker].columns:
                 st.error(f"No se encontró la columna de cierre para el ticker {ticker}.")
                 return None
-            local_vars[ticker.replace('.', '_')] = data_dict[ticker][close_col].reindex(index).fillna(method='ffill').fillna(method='bfill')
+            local_vars[ticker.replace('.', '_').replace('^', '_')] = data_dict[ticker][close_col].reindex(index).fillna(method='ffill').fillna(method='bfill')
         
         # Replace ticker names in the expression
         eval_expression = expression
         for ticker in tickers:
-            eval_expression = eval_expression.replace(ticker, ticker.replace('.', '_'))
+            eval_expression = eval_expression.replace(ticker, ticker.replace('.', '_').replace('^', '_'))
         
         # Evaluate the expression
         result = pd.eval(eval_expression, local_dict=local_vars, engine='python')
