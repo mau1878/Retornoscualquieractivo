@@ -52,7 +52,7 @@ def evaluate_ticker_expression(expression, data_dict, index):
     """
     try:
         # Extract potential tickers (start with letter, allow letters, numbers, dots)
-        potential_tickers = set(re.findall(r'\b[A-Za-z][A-Za-z0-9\._]*\^b', expression))
+        potential_tickers = set(re.findall(r'\b[A-Za-z][A-Za-z0-9\.^]*\b', expression))
         # Only include tickers that exist in data_dict
         tickers = [t for t in potential_tickers if t in data_dict]
         
