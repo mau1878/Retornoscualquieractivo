@@ -277,7 +277,7 @@ with tab1:
     if input_type == "Ticker único":
         ticker = st.text_input("🖊️ Ingrese el símbolo del ticker", value="AAPL", key="ticker_original").upper()
         expression = None
-        tickers = [ticker] if ticker and re.match(r'^[A-Za-z][A-Za-z0-9\._]*$', ticker) else []
+        tickers = [ticker] if ticker and re.match(r'^[\^A-Za-z][A-Za-z0-9\._]*$', ticker) else []
     else:
         expression = st.text_input("🖊️ Ingrese la expresión (e.g., GGAL.BA*10/GGAL)", value="GGAL.BA*10/GGAL", key="expression_original")
         tickers = list(set(re.findall(r'\b[A-Za-z][A-Za-z0-9\._]*\b', expression))) if expression else []
